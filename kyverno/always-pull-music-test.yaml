@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: music-pod
+  namespace: music
+spec:
+  containers:
+  - name: music-app
+    image: nginx

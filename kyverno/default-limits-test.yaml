@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: medical-pod
+  namespace: default
+spec:
+  containers:
+  - name: nginx
+    image: nginx
