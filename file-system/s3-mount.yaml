@@ -1,0 +1,60 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: s3-storage-class
+provisioner: s3.csi.aws.com # Invokes the Mountpoint for Amazon S3 CSI driver
+allowVolumeExpansion: false
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: s3-persistent-volume
+spec:
+  capacity:
+    storage: 1Ti # S3 storage is virtually limitless; this is a mandatory placeholder capacity
+  accessModes:
+    - ReadWriteMany # Allows shared concurrent access by multiple pods across different nodes
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: s3-storage-class
+  mountOptions:
+    - --region us-east-1 # Define the exact region where your bucket resides
+    - --no-sign-request  # Optional: use only if accessing a completely public S3 bucket
+  csi:
+    driver: s3.csi.aws.com
+    volumeHandle: s3-migration-bucket-volume
+    volumeAttributes:
+      bucketName: your-target-s3-bucket-name # Replace with your actual S3 bucket name
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: s3-volume-claim
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: s3-storage-class
+  volumeName: s3-persistent-volume # Explicitly binds this claim to the PV declared above
+  resources:
+    requests:
+      storage: 1Ti
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: s3-application-pod
+spec:
+  containers:
+    - name: data-processor
+      image: ubuntu
+      command: ["/bin/sh", "-c"]
+      args: ["tail -f /dev/null"] # Keeps the container active to explore file assets
+      volumeMounts:
+        - name: s3-storage-mount
+          mountPath: /data/s3-mount # The location inside the container accessing S3 data
+  volumes:
+    - name: s3-storage-mount
+      persistentVolumeClaim:
+        claimName: s3-volume-claim

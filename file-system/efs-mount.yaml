@@ -1,0 +1,60 @@
+# 1. STORAGE CLASS
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: efs-sc
+provisioner: efs.csi.aws.com
+---
+# 2. PERSISTENT VOLUME (PV)
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: efs-pv
+spec:
+  capacity:
+    storage: 5Gi # Placeholder value (EFS scales automatically)
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany # Allows multiple pods on different nodes to read/write concurrently
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: efs-sc
+  csi:
+    driver: efs.csi.aws.com
+    volumeHandle: fs-0123456789abcdef0 # ⚠️ REPLACE with your actual AWS EFS File System ID
+---
+# 3. PERSISTENT VOLUME CLAIM (PVC)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: efs-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: efs-sc
+  volumeName: efs-pv # Explicitly binds to the static PV created above
+  resources:
+    requests:
+      storage: 5Gi
+---
+# 4. POD (CONSUMER)
+apiVersion: v1
+kind: Pod
+metadata:
+  name: efs-app-pod
+spec:
+  containers:
+    - name: app-container
+      image: alpine
+      command: ["/bin/sh", "-c"]
+      args:
+        - while true; do
+            echo "$(date) - Hello from EFS" >> /data/shared-log.txt;
+            sleep 5;
+          done
+      volumeMounts:
+        - name: efs-storage
+          mountPath: /data # Directory inside the container where EFS is mounted
+  volumes:
+    - name: efs-storage
+      persistentVolumeClaim:
+        claimName: efs-pvc
